@@ -175,7 +175,7 @@
 
 <script>
 /* -----------------------
-   質問などのデータ
+   質問データ
 ------------------------ */
 const questions = [
   "ここ1年間、Webサイトの更新が「1ヶ月以上止まっていた月」がありましたか？",
@@ -263,7 +263,7 @@ const questionComments = [
 ];
 
 /* -----------------------
-   状態・DOM
+   状態
 ------------------------ */
 let answers = [];
 let currentQuestion = 0;
@@ -271,11 +271,9 @@ let companyName = "";
 let personName = "";
 let titleName = "";
 
-const infoSection = document.getElementById("info-section");
-const questionSection = document.getElementById("question-section");
-const resultSection = document.getElementById("result-section");
-const reportWrapper = document.getElementById("report-wrapper");
-
+/* -----------------------
+   STEP0 → STEP1
+------------------------ */
 document.getElementById("start-btn").onclick = () => {
   companyName = document.getElementById("company-name").value.trim();
   personName = document.getElementById("person-name").value.trim();
@@ -286,11 +284,11 @@ document.getElementById("start-btn").onclick = () => {
     return;
   }
 
-  infoSection.style.display = "none";
-  questionSection.style.display = "block";
-  currentQuestion = 0;
-  answers = [];
+  document.getElementById("info-section").style.display = "none";
+  document.getElementById("question-section").style.display = "block";
 
+  answers = [];
+  currentQuestion = 0;
   showQuestion();
 };
 
@@ -300,26 +298,29 @@ function showQuestion() {
   document.getElementById("question-text").textContent =
     questions[currentQuestion];
   document.getElementById("progress-note").textContent =
-    `ここまでの「はい」：${answers.filter(x => x === 1).length}件`;
+    `ここまでの「はい」：${answers.filter(v => v === 1).length}件`;
 }
 
+/* -----------------------
+   質問 → 次へ
+------------------------ */
 document.getElementById("yes-btn").onclick = () => handleAnswer(1);
 document.getElementById("no-btn").onclick = () => handleAnswer(0);
 
-function handleAnswer(val) {
-  answers.push(val);
+function handleAnswer(v) {
+  answers.push(v);
 
   if (currentQuestion < 9) {
     currentQuestion++;
     showQuestion();
   } else {
-    questionSection.style.display = "none";
+    document.getElementById("question-section").style.display = "none";
     showResult();
   }
 }
 
 /* -----------------------
-   タイトル判定ロジック（完全統合版）
+   ★ 新・判定ロジック（A > B > C）
 ------------------------ */
 function calcType() {
   const scores = {
@@ -327,29 +328,41 @@ function calcType() {
     B: typeQuestionMap.B.reduce((s, i) => s + answers[i], 0),
     C: typeQuestionMap.C.reduce((s, i) => s + answers[i], 0)
   };
+
   const totalYes = scores.A + scores.B + scores.C;
 
-  // ① 全て「いいえ」なら NONE
+  // ① 全部「いいえ」なら NONE
   if (totalYes === 0) return "NONE";
 
-  // ② C > A > B の優先順位
+  // ② 最大値を取得
   const max = Math.max(scores.A, scores.B, scores.C);
-  if (scores.C === max) return "C";
-  if (scores.A === max) return "A";
-  return "B";
+
+  // ③ 最大値のタイプを収集
+  const tied = [];
+  if (scores.A === max) tied.push("A");
+  if (scores.B === max) tied.push("B");
+  if (scores.C === max) tied.push("C");
+
+  // ④ 単独ならそれを返す
+  if (tied.length === 1) return tied[0];
+
+  // ⑤ 同点時の優先順位：A > B > C
+  if (tied.includes("A")) return "A";
+  if (tied.includes("B")) return "B";
+  return "C";
 }
 
 /* -----------------------
-   診断結果のHTML生成
+   ★ レポート生成
 ------------------------ */
 function showResult() {
   const type = calcType();
-  const yesList = answers.map((v,i) => v===1 ? i : null).filter(x => x !== null);
+  const yesList = answers.map((v,i)=>v===1?i:null).filter(v=>v!==null);
   const picked = yesList.slice(0,3);
 
   let html = "";
 
-  /* NONEの場合（課題顕在化なし） */
+  /* ▼ NONE専用レポート */
   if (type === "NONE") {
     html += `
       <div class="result-section-block">
@@ -370,13 +383,13 @@ function showResult() {
         <ul>
           <li>月1の定例で改善ポイントを確認するだけでも効果が出やすいです。</li>
           <li>コンテンツの型化・テンプレ化により運用負荷をさらに下げられます。</li>
-          <li>リード活用のシナリオを1本だけ設計するだけでも成果につながります。</li>
+          <li>リード活用のシナリオを1本だけ設計すると成果につながります。</li>
         </ul>
       </div>
 
       <div class="result-section-block">
         <h3>4. 最後に</h3>
-        <p>「特段困っているわけではないが、気になる点はある」<br>
+        <p>「特段困ってはいないけど、少し気になる点はある」<br>
         もしそのように感じていただけましたら、カジュアルに情報交換できれば幸いです。</p>
 
         <a class="schedule-btn"
@@ -387,15 +400,14 @@ function showResult() {
       </div>
     `;
 
-    reportWrapper.innerHTML = html;
-    resultSection.style.display = "block";
+    document.getElementById("report-wrapper").innerHTML = html;
+    document.getElementById("result-section").style.display = "block";
     return;
   }
 
-  /* 通常タイプの処理 */
+  /* ▼ 通常タイプ */
   const def = typeDefinitions[type];
 
-  /* 冒頭 */
   html += `
   <div class="result-section-block">
     <h3>1. 冒頭サマリー</h3>
@@ -405,7 +417,6 @@ function showResult() {
     <strong>「${def.label}」</strong> の傾向が見られました。</p>
   </div>`;
 
-  /* タイプ説明 */
   html += `
   <div class="result-section-block">
     <h3>2. あなたのタイプ</h3>
@@ -413,36 +424,34 @@ function showResult() {
     <p>${def.description}</p>
   </div>`;
 
-  /* 失敗パターン */
   html += `
   <div class="result-section-block">
     <h3>3. よくある失敗パターン</h3>
     <ul>
-      ${def.failures.map(f => `<li>${f}</li>`).join("")}
+      ${def.failures.map(f=>`<li>${f}</li>`).join("")}
     </ul>
   </div>`;
 
-  /* アクション */
   html += `
   <div class="result-section-block">
     <h3>4. まず取り組むべき3つのアクション</h3>
     <ul>
-      ${def.actions.map(a => `<li>${a}</li>`).join("")}
+      ${def.actions.map(a=>`<li>${a}</li>`).join("")}
     </ul>
   </div>`;
 
-  /* 個別コメント */
   html += `
   <div class="result-section-block">
     <h3>5. 回答内容からのコメント</h3>
     <ul>
-      ${picked.length === 0
+      ${
+        picked.length === 0
         ? "<li>特に大きな課題は顕在化していませんが、今後に向けた基盤整備が有効です。</li>"
-        : picked.map(i => `<li>${questionComments[i]}</li>`).join("")}
+        : picked.map(i=>`<li>${questionComments[i]}</li>`).join("")
+      }
     </ul>
   </div>`;
 
-  /* クロージング */
   html += `
   <div class="result-section-block">
     <h3>6. 最後に</h3>
@@ -456,20 +465,20 @@ function showResult() {
       日程を調整する
     </a>
 
-    <p style="margin-top:16px;">貴社の取り組みが、今後さらに前に進む一助となれば幸いです。</p>
+    <p style="margin-top:16px;">貴社の取り組みが今後さらに前に進む一助となれば幸いです。</p>
   </div>`;
 
-  reportWrapper.innerHTML = html;
-  resultSection.style.display = "block";
+  document.getElementById("report-wrapper").innerHTML = html;
+  document.getElementById("result-section").style.display = "block";
 }
 
 /* -----------------------
    リスタート
 ------------------------ */
 document.getElementById("restart-btn").onclick = () => {
-  resultSection.style.display = "none";
-  questionSection.style.display = "none";
-  infoSection.style.display = "block";
+  document.getElementById("result-section").style.display = "none";
+  document.getElementById("question-section").style.display = "none";
+  document.getElementById("info-section").style.display = "block";
 };
 </script>
 </body>
